@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>שירותים - קנדלייט | ארוחות רומנטיות, אירועים וקייטרינג יוקרתי</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48x48.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="assets/favicon-512x512.png">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+    <!-- Cookie Consent -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vanilla-cookieconsent@3/dist/cookieconsent.css" />
+    <script src="https://cdn.jsdelivr.net/npm/vanilla-cookieconsent@3/dist/cookieconsent.umd.js"></script>
+    <!-- Mickidum Accessibility Toolbar -->
+    <script src="https://cdn.jsdelivr.net/gh/mickidum/acc_toolbar/acctoolbar/acctoolbar.min.js"></script>
+<!-- Zappy Analytics -->
+<script>
+(function() {
+  'use strict';
+  
+  // Configuration
+  var config = {
+    websiteId: 'c5c02e2b-c06a-4358-9c63-ad922f06733e',
+    apiUrl: 'http://localhost:5001/api/analytics/track',
+    sessionDuration: 30 * 60 * 1000, // 30 minutes
+    trackPageViews: true,
+    trackClicks: true,
+    trackFormSubmissions: true
+  };
+  
+  // Generate or retrieve session ID
+  function getSessionId() {
+    var sessionKey = 'zappy_session_' + config.websiteId;
+    var session = null;
+    
+    try {
+      session = sessionStorage.getItem(sessionKey);
+      if (session) {
+        var sessionData = JSON.parse(session);
+        var now = Date.now();
+        
+        // Check if session is still valid
+        if (now - sessionData.timestamp < config.sessionDuration) {
+          // Update timestamp
+          sessionData.timestamp = now;
+          sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
+          return sessionData.id;
+        }
+      }
+    } catch (e) {
+      console.warn('Zappy Analytics: SessionStorage not available');
+    }
+    
+    // Generate new session ID
+    var newSessionId = 'zs_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    try {
+      sessionStorage.setItem(sessionKey, JSON.stringify({
+        id: newSessionId,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      // Continue without session storage
+    }
+    
+    return newSessionId;
+  }
+  
+  var sessionId = getSessionId();
+  
+  // Track an event
+  function trackEvent(eventType, data) {
+    data = data || {};
+    
+    var eventData = {
+      website_id: config.websiteId,
+      event_type: eventType,
+      page_path: window.location.pathname,
+      referrer: document.referrer || 'direct',
+      session_id: sessionId,
+      metadata: data
+    };
+    
+    // Use sendBeacon if available (better for page unload events)
+    if (navigator.sendBeacon) {
+      var blob = new Blob([JSON.stringify(eventData)], { type: 'application/json' });
+      navigator.sendBeacon(config.apiUrl, blob);
+    } else {
+      // Fallback to fetch
+      fetch(config.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(eventData),
+        keepalive: true
+      }).catch(function(error) {
+        console.warn('Zappy Analytics: Failed to track event', error);
+      });
+    }
+  }
+  
+  // Track page view
+  if (config.trackPageViews) {
+    trackEvent('pageview', {
+      title: document.title,
+      url: window.location.href
+    });
+  }
+  
+  // Track clicks on important elements
+  if (config.trackClicks) {
+    document.addEventListener('click', function(e) {
+      var target = e.target;
+      
+      // Track button clicks
+      if (target.tagName === 'BUTTON' || target.closest('button')) {
+        var button = target.tagName === 'BUTTON' ? target : target.closest('button');
+        trackEvent('click', {
+          element: 'button',
+          text: button.textContent.trim().substring(0, 100),
+          id: button.id || null,
+          class: button.className || null
+        });
+      }
+      
+      // Track link clicks
+      else if (target.tagName === 'A' || target.closest('a')) {
+        var link = target.tagName === 'A' ? target : target.closest('a');
+        trackEvent('click', {
+          element: 'link',
+          text: link.textContent.trim().substring(0, 100),
+          href: link.href,
+          external: link.hostname !== window.location.hostname
+        });
+      }
+    }, true);
+  }
+  
+  // Track form submissions
+  if (config.trackFormSubmissions) {
+    document.addEventListener('submit', function(e) {
+      var form = e.target;
+      
+      trackEvent('form_submit', {
+        form_id: form.id || null,
+        form_name: form.name || null,
+        form_action: form.action || null,
+        form_method: form.method || 'GET'
+      });
+    }, true);
+  }
+  
+  // Track time on page (send on page unload)
+  var pageLoadTime = Date.now();
+  
+  window.addEventListener('beforeunload', function() {
+    var timeOnPage = Math.floor((Date.now() - pageLoadTime) / 1000); // in seconds
+    
+    trackEvent('page_unload', {
+      time_on_page: timeOnPage,
+      page_path: window.location.pathname
+    });
+  });
+  
+  // Expose tracking function globally for custom events
+  window.zappyAnalytics = {
+    track: trackEvent,
+    getSessionId: function() { return sessionId; }
+  };
+  
+})();
+</script>
+<!-- End Zappy Analytics -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="navbar" id="navbar">
+    <div class="container nav-container">
+      <div class="nav-brand"><a href="/" class="logo-link" aria-label="Home" style="display: inline-block; text-decoration: none; line-height: 0; margin-right: 0; vertical-align: middle;"><img src="assets/logo.webp" alt="קנדלייט" class="logo" style="max-height: 60px; height: auto; width: auto; max-width: 250px; object-fit: contain; background: transparent; image-rendering: crisp-edges;" /></a><span class="brand-title">קנדלייט</span>
+      </div>
+      
+      <button class="mobile-toggle" id="mobileToggle" aria-label="תפריט">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="/services" class="active">שירותים</a></li>
+        <li><a href="/gallery">גלריה</a></li>
+        <li><a href="/about">אודות</a></li>
+        <li><a href="/contact">צור קשר</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="page-header">
+    <div class="container">
+      <h1>השירותים שלנו</h1>
+      <p>חוויות קולינריות מותאמות אישית לכל אירוע ואירוע</p>
+    </div>
+  </section>
+
+  <section class="services-detailed">
+    <div class="container">
+      <div class="service-detail">
+        <div class="service-detail-image">
+          <img src="assets/business-hero.webp" alt="ארוחות רומנטיות">
+        </div>
+        <div class="service-detail-content">
+          <h2>ארוחות רומנטיות</h2>
+          <p>צרו רגעים בלתי נשכחים עם בן או בת הזוג שלכם. אנו מציעים חוויה קולינרית אינטימית ומיוחדת שכוללת:</p>
+          <ul class="service-features">
+            <li><i class="fas fa-check"></i> תפריט מותאם אישית בהתאם להעדפותיכם</li>
+            <li><i class="fas fa-check"></i> סידור שולחן יוקרתי עם נרות ופרחים</li>
+            <li><i class="fas fa-check"></i> אווירה רומנטית ואינטימית</li>
+            <li><i class="fas fa-check"></i> שירות מקצועי ודיסקרטי</li>
+            <li><i class="fas fa-check"></i> מנות גורמה מהמטבח העולמי</li>
+            <li><i class="fas fa-check"></i> אפשרות להוספת הפתעות מיוחדות</li>
+          </ul>
+          <p>אידיאלי לימי נישואין, הצעות נישואין, או פשוט ערב רומנטי מיוחד.</p>
+        </div>
+      </div>
+
+      <div class="service-detail reverse">
+        <div class="service-detail-image">
+          <img src="assets/business-service-1.webp" alt="אירוח אירועים">
+        </div>
+        <div class="service-detail-content">
+          <h2>אירוח אירועים פרטיים</h2>
+          <p>האירוע המושלם מתחיל בתכנון מדויק ומסתיים בחוויה בלתי נשכחת. אנו מתמחים באירוח:</p>
+          <ul class="service-features">
+            <li><i class="fas fa-check"></i> ימי הולדת ואירועים משפחתיים</li>
+            <li><i class="fas fa-check"></i> אירועים עסקיים וכנסים</li>
+            <li><i class="fas fa-check"></i> חגיגות ואירועי יובל</li>
+            <li><i class="fas fa-check"></i> מסיבות פרטיות ואירועי רשת</li>
+            <li><i class="fas fa-check"></i> תכנון מלא של האירוע</li>
+            <li><i class="fas fa-check"></i> צוות שירות מקצועי</li>
+          </ul>
+          <p>כל אירוע מקבל תשומת לב אישית ומותאם במדויק לצרכים ולתקציב שלכם.</p>
+        </div>
+      </div>
+
+      <div class="service-detail">
+        <div class="service-detail-image">
+          <img src="assets/business-service-2.webp" alt="קייטרינג יוקרתי">
+        </div>
+        <div class="service-detail-content">
+          <h2>קייטרינג יוקרתי</h2>
+          <p>שירותי קייטרינג ברמה הגבוהה ביותר לכל סוג אירוע ומיקום:</p>
+          <ul class="service-features">
+            <li><i class="fas fa-check"></i> תפריטים מגוונים - בשרי, צמחוני, טבעוני, כשר</li>
+            <li><i class="fas fa-check"></i> מנות גורמה ומצגת מרשימה</li>
+            <li><i class="fas fa-check"></i> שירות מלא כולל כלים וציוד</li>
+            <li><i class="fas fa-check"></i> התאמה לדרישות תזונתיות מיוחדות</li>
+            <li><i class="fas fa-check"></i> הגעה לכל מיקום בארץ</li>
+            <li><i class="fas fa-check"></i> אפשרות להוספת בר משקאות</li>
+          </ul>
+          <p>מתאים לאירועים קטנים ובינוניים, עם גמישות מלאה בתפריט ובהגשה.</p>
+        </div>
+      </div>
+
+      <div class="service-detail reverse">
+        <div class="service-detail-image">
+          <img src="assets/business-service-3.webp" alt="ארוחות פרטיות">
+        </div>
+        <div class="service-detail-content">
+          <h2>ארוחות פרטיות בבית</h2>
+          <p>חוויה של מסעדה יוקרתית בנוחות הבית שלכם:</p>
+          <ul class="service-features">
+            <li><i class="fas fa-check"></i> שף פרטי מגיע אליכם הביתה</li>
+            <li><i class="fas fa-check"></i> בישול טרי במקום</li>
+            <li><i class="fas fa-check"></i> תפריט מותאם אישית</li>
+            <li><i class="fas fa-check"></i> שירות והגשה מקצועיים</li>
+            <li><i class="fas fa-check"></i> ניקיון מלא אחרי הארוחה</li>
+            <li><i class="fas fa-check"></i> אווירה אינטימית בסביבה מוכרת</li>
+          </ul>
+          <p>אידיאלי לארוחות משפחתיות מיוחדות או אירוח אורחים ברמה גבוהה.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing-info">
+    <div class="container">
+      <h2 class="section-title">מידע נוסף</h2>
+      <div class="info-boxes">
+        <div class="info-box">
+          <i class="fas fa-calendar-alt"></i>
+          <h3>הזמנה מראש</h3>
+          <p>מומלץ להזמין לפחות שבועיים מראש. לאירועים גדולים - חודש מראש.</p>
+        </div>
+        <div class="info-box">
+          <i class="fas fa-users"></i>
+          <h3>גודל אירוע</h3>
+          <p>אנו מטפלים באירועים מזוגיים ועד 200 איש.</p>
+        </div>
+        <div class="info-box">
+          <i class="fas fa-utensils"></i>
+          <h3>תפריטים מותאמים</h3>
+          <p>כל תפריט מותאם אישית להעדפות ולדרישות התזונתיות שלכם.</p>
+        </div>
+        <div class="info-box">
+          <i class="fas fa-phone"></i>
+          <h3>ייעוץ חינם</h3>
+          <p>פגישת ייעוץ ראשונית ללא עלות לתכנון האירוע.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-content">
+        <h2>מעוניינים להזמין?</h2>
+        <p>צרו איתנו קשר לייעוץ חינם ותכנון האירוע המושלם</p>
+        <a href="/contact" class="cta-button">צרו קשר</a>
+      </div>
+    </div>
+  </section>
+
+  
+    <!-- Legal Footer -->
+    <footer class="legal-footer">
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-main">
+            <p>© 2025 קנדלייט. כל הזכויות שמורות.</p>
+            <p class="zappy-attribution">נוצר באמצעות Zappy</p>
+          </div>
+          <div class="footer-social"><a href="[facebook_url]" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+<a href="[instagram_url]" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+<a href="[whatsapp_url]" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a></div>
+          <div class="footer-legal">
+            <a href="privacy.html" target="_blank" rel="noopener" aria-label="מדיניות פרטיות">
+              מדיניות פרטיות
+            </a>
+            <span class="separator">|</span>
+            <a href="accessibility.html" target="_blank" rel="noopener" aria-label="נגישות">
+              נגישות
+            </a>
+            <span class="separator">|</span>
+            <a href="terms.html" target="_blank" rel="noopener" aria-label="תנאי שימוש">
+              תנאי שימוש
+            </a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  <a href="tel:[phone_number]" class="phone-float" aria-label="התקשרו אלינו">
+    <i class="fas fa-phone"></i>
+  </a>
+  <a href="https://wa.me/[whatsapp_number]" target="_blank" class="whatsapp-float" aria-label="WhatsApp" rel="noopener noreferrer">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+    <div data-integration="accessibility:toolbar"></div>
+    <script src="script.js"></script>
+</body>
+</html>
